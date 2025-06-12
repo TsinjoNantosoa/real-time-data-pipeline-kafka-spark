@@ -1,6 +1,8 @@
 import json
 from datetime import datetime
 from airflow import DAG
+from airflow.providers.standard.operators.python import PythonOperator
+
 # from airflow.operators.python import PythonOperator  # corrected operator path
 
 default_args = {
@@ -36,17 +38,16 @@ def stream_data():
     print(json.dumps(result, indent=3))
 
 
-# Décommente ceci pour exécuter dans Airflow
-# with DAG(
-#     'user_automation',
-#     default_args=default_args,
-#     schedule='@daily',
-#     catchup=False
-# ) as dag:
-#     streaming_task = PythonOperator(
-#         task_id='stream_data_from_api',
-#         python_callable=stream_data
-#     )
 
-# Test local
+with DAG(
+    'user_automation',
+    default_args=default_args,
+    schedule='@daily',
+    catchup=False
+) as dag:
+    streaming_task = PythonOperator(
+        task_id='stream_data_from_api',
+        python_callable=stream_data
+    )
+
 stream_data()
