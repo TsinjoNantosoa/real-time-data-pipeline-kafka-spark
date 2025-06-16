@@ -1,4 +1,4 @@
-version: "3.8"
+#version: "3.8"
 
 services:
   zookeeper:
@@ -87,6 +87,8 @@ services:
         condition: service_healthy
       schema-registry:
         condition: service_healthy
+    ports:
+      - "9021:9021"
     environment:
       # ✅ Utilise le même port corrigé que ci-dessus
       CONTROL_CENTER_BOOTSTRAP_SERVERS: 'broker:29092'
