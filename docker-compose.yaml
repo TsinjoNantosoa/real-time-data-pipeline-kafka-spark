@@ -1,4 +1,4 @@
-#version: "3.8"
+version: "3.8"
 
 services:
   zookeeper:
@@ -32,8 +32,8 @@ services:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
-      # ✅ Correction ici : port changé de 92092 à 29092 (valide entre 1 et 65535)
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://broker:29092,PLAINTEXT_HOST://broker:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://broker:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:29092,PLAINTEXT_HOST://0.0.0.0:9092
       KAFKA_METRICS_REPORTERS: io.confluent.metrics.reporter.ConfluentMetricsReporter
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
@@ -44,7 +44,6 @@ services:
       KAFKA_JMX_PORT: 9101
       KAFKA_JMX_HOSTNAME: localhost
       KAFKA_CONFLUENT_SCHEMA_REGISTRY_URL: http://schema-registry:8081
-      # ✅ Correction ici aussi : port changé pour correspondre à la ligne ci-dessus
       CONFLUENT_METRICS_REPORTER_BOOTSTRAP_SERVERS: broker:29092
       CONFLUENT_METRICS_REPORTER_TOPIC_REPLICAS: 1
       CONFLUENT_METRICS_ENABLE: 'false'
@@ -59,6 +58,7 @@ services:
 
   schema-registry:
     image: confluentinc/cp-schema-registry:7.4.0
+    hostname: schema-registry
     container_name: schema-registry
     depends_on:
       broker:
@@ -67,7 +67,6 @@ services:
       - "8081:8081"
     environment:
       SCHEMA_REGISTRY_HOST_NAME: schema-registry
-      # ✅ Port corrigé ici aussi (doit correspondre à celui exposé par le broker)
       SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: 'broker:29092'
       SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
     networks:
@@ -90,7 +89,6 @@ services:
     ports:
       - "9021:9021"
     environment:
-      # ✅ Utilise le même port corrigé que ci-dessus
       CONTROL_CENTER_BOOTSTRAP_SERVERS: 'broker:29092'
       CONTROL_CENTER_SCHEMA_REGISTRY_URL: 'http://schema-registry:8081'
       CONTROL_CENTER_REPLICATION_FACTOR: 1
@@ -99,6 +97,33 @@ services:
       CONFLUENT_METRICS_TOPIC_PARTITIONS: 1
       CONFLUENT_METRICS_ENABLE: 'false'
       PORT: 9021
+    networks:
+      - confluent
+
+  webserver:
+    image: apache/airflow:2.6.0-python3.9
+    command: webserver
+    entrypoint: []
+    depends_on:
+      - postgres
+    environment:
+      - LOAD_EX=n
+      - EXECUTOR=sequential
+      - AIRFLOW_DATABASE_SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
+      - AIRFLOW_WEBSERVER_SECRET_KEY=this_is_a_very_secured_key
+    logging:
+      options:
+        max-size: 10m
+        max-file: '3'
+    volumes:
+      - ./dags:airflow/dags
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ['CMD-SHELL', " -f /opt/airflow/airflow-webserver.pid"]
+      interval: 30s
+      timeout: 30s
+      retries: 3
     networks:
       - confluent
 
