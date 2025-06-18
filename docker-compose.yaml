@@ -1,4 +1,4 @@
-version: "3.8"
+#version: "3.8"
 
 services:
   zookeeper:
@@ -103,13 +103,13 @@ services:
   webserver:
     image: apache/airflow:2.6.0-python3.9
     command: webserver
-    entrypoint: ['/opt/airflow/script/entrypoint.sh']
+    entrypoint: [ '/opt/airflow/script/entrypoint.sh' ]  # ✅ OK
     depends_on:
       - postgres
     environment:
       - LOAD_EX=n
       - EXECUTOR=sequential
-      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://tsinjo:nantosoa@postgres:5432/airflow
       - AIRFLOW_WEBSERVER_SECRET_KEY=this_is_a_very_secured_key
     logging:
       options:
@@ -117,12 +117,12 @@ services:
         max-file: "3"
     volumes:
       - ./dags:/opt/airflow/dags
-      - ./script/entrypoint.sh:/opt/airflow/scripts/entrypoint.sh
+      - ./script/entrypoint.sh:/opt/airflow/script/entrypoint.sh  # ✅ Corrigé ici
       - ./requirements.txt:/opt/airflow/requirements.txt
     ports:
       - "8080:8080"
     healthcheck:
-      test: ['CMD-SHELL', 'test -f /opt/airflow/airflow-webserver.pid']
+      test: [ 'CMD-SHELL', 'test -f /opt/airflow/airflow-webserver.pid' ]
       interval: 30s
       timeout: 30s
       retries: 3
@@ -153,7 +153,7 @@ services:
     environment:
       - LOAD_EX=n
       - EXECUTOR=sequential
-      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://tsinjo:nantosoa@postgres:5432/airflow
       - AIRFLOW_WEBSERVER_SECRET_KEY=this_is_a_very_secured_key
     command: bash -c "pip install -r ./requirements.txt && airflow db upgrade && airflow scheduler"
     networks:
