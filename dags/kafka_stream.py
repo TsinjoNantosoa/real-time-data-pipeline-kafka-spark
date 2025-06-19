@@ -1,14 +1,30 @@
 import json
 import requests
+import logging
+from airflow.operators.python import PythonOperator
+# from airflow.providers.standard.operators.python import PythonOperator
 from kafka import KafkaProducer
+from datetime import datetime, timedelta, time
 
+from airflow import DAG
+# from airflow.operators.python import PythonOperator
 
+# ✅ 1. Définir default_args
+default_args = {
+    'owner': 'airflow',
+    'depends_on_past': False,
+    'start_date': datetime(2024, 6, 1),
+    'retries': 1,
+    'retry_delay': timedelta(minutes=5),
+}
+
+# ✅ 2. Fonction pour obtenir les données
 def get_data():
     res = requests.get("https://randomuser.me/api/")
     res = res.json()
     return res['results'][0]
 
-
+# ✅ 3. Formatage des données
 def format_data(res):
     data = {
         'gender': res['gender'],
@@ -42,15 +58,64 @@ def format_data(res):
     }
     return data
 
+# ✅ 4. Fonction principale appelée par Airflow
+# def stream_data():
+#     try:
+#         res = get_data()
+#         res = format_data(res)
+#         producer = KafkaProducer(
+#             bootstrap_servers=['broker:29092'],
+#             value_serializer=lambda v: json.dumps(v).encode('utf-8'),
+#             max_block_ms=5000
+#         )
+#         producer.send('users_created', value=res)
+#         producer.flush()
+#         logging.info("✅ Message envoyé dans 'users_created'")
+#     except Exception as e:
+#         logging.error(f"❌ Erreur : {e}")
+#         raise
 
 def stream_data():
-    res = get_data()
-    res = format_data(res)
-    producer = KafkaProducer(bootstrap_servers=['localhost:9092'], max_block_ms=5000)
-    producer.send('users_created', json.dumps(res).encode('utf-8'))
-    producer.flush()
-    print("✅ Message envoyé dans 'users_created'")
+    try:
+        # Temps de départ
+        curr_time = time.time()
 
+        # Initialisation du producteur Kafka
+        producer = KafkaProducer(
+            bootstrap_servers=['broker:29092'],
+            value_serializer=lambda v: json.dumps(v).encode('utf-8'),
+            max_block_ms=5000
+        )
 
-if __name__ == "__main__":
-    stream_data()
+        # Boucle pendant 60 secondes
+        while time.time() - curr_time < 60:
+            try:
+                raw_data = get_data()
+                formatted_data = format_data(raw_data)
+                producer.send('users_created', value=formatted_data)
+                logging.info("✅ Message envoyé dans 'users_created'")
+            except Exception as e:
+                logging.error(f"❌ Erreur lors de l'envoi du message : {e}")
+                continue
+
+        # Nettoyage
+        producer.flush()
+        producer.close()
+
+    except Exception as e:
+        logging.error(f"❌ Erreur générale dans stream_data : {e}")
+        raise
+
+# ✅ 5. Définir le DAG avec les arguments corrigés
+with DAG(
+    dag_id='user_automation',
+    default_args=default_args,
+    schedule='@daily',
+    catchup=False,
+    description='Stream data daily from API'
+) as dag:
+
+    streaming_task = PythonOperator(
+        task_id='stream_data_from_api',
+        python_callable=stream_data
+    )
